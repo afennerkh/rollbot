@@ -6,6 +6,7 @@ import { AppComponent } from './app.component';
 import { TstDotConnectComponent } from './tst-dot-connect/tst-dot-connect.component';
 import { ContainerComponent } from './container/container.component';
 import { SpotlightComponent } from './spotlight/spotlight.component';
+import { TestcomponentComponent } from './testcomponent/testcomponent.component';
 
 @NgModule({
   declarations: [
@@ -13,6 +14,7 @@ import { SpotlightComponent } from './spotlight/spotlight.component';
     TstDotConnectComponent,
     ContainerComponent,
     SpotlightComponent,
+    TestcomponentComponent,
   ],
   imports: [
     BrowserModule,

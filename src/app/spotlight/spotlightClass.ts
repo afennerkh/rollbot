@@ -81,7 +81,7 @@ export interface SpotlightSetup {
     denominator: number
     tickStepSize: number 
     stepSize: number
-    labelTicks: boolean
+    labelTicks: boolean | null
     timeStep: number
     hints: Array<number>
     majorJumps: number
@@ -117,7 +117,7 @@ export function PuzzleSpotlight(els,state){
       targetInPixels: number
       tickHeight: number
       lineWidthInUnits: number
-      fontSize: number = 30
+      fontSize = 30
       aspectRatioHW: number
       range: number
       _numberLineY: number
@@ -127,7 +127,7 @@ export function PuzzleSpotlight(els,state){
       feedbackBegun: false
       currentShineTarget: number
       shineCenter: number
-      rotation: number = 0
+      rotation = 0
       shineLeft: number
       markings: Array<Marking>
       shineRight: number
@@ -137,22 +137,23 @@ export function PuzzleSpotlight(els,state){
       anchorWidth: number
       expansion: number
       strokeWidth: number
-      awaitingInput: boolean = true
+      awaitingInput = true
       jumps: Jumps
       sessionState: SpotlightState
       feedbackComplete: boolean
       dt: number
-      width: number = 1280
-      onSuccess: Function
-      onTryAgain: Function
-      resetBtnURL: string = "https://res.cloudinary.com/duim8wwno/image/upload/v1647289526/SpotlightRetryBtn_nwcp3o.svg"
-      goBtnURL: string = "https://res.cloudinary.com/duim8wwno/image/upload/v1644246521/SpotlightGoBtn_eqeyvr.svg"
+      width = 1280
+      onSuccess: ()=>void
+      onTryAgain: ()=>void
+      resetBtnURL = "https://res.cloudinary.com/duim8wwno/image/upload/v1647289526/SpotlightRetryBtn_nwcp3o.svg"
+      goBtnURL = "https://res.cloudinary.com/duim8wwno/image/upload/v1644246521/SpotlightGoBtn_eqeyvr.svg"
     
 
       // #endregion
 
       // #region CONSTRUCTOR
       constructor(els,state){
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         self = this
         this.els = els 
         this.gsvg = els[0]
@@ -260,7 +261,7 @@ export function PuzzleSpotlight(els,state){
   
       if (self.awaitingInput){
           self.currentShineTarget = self.cursorPoint(e).x;
-          let dx = self.shineCenter - self.currentShineTarget;
+          const dx = self.shineCenter - self.currentShineTarget;
           const theta = Math.atan(dx / self.yFromNumberLineToLight);
           self.rotation = theta;
           gsap.set(self.light, {
@@ -304,7 +305,7 @@ export function PuzzleSpotlight(els,state){
         const canLeftY = 129 + H2 * Math.cos(alpha);
     
 
-        let s =
+        const s =
           "M " +
           left +
           " " +
@@ -583,7 +584,7 @@ export function PuzzleSpotlight(els,state){
 
       onViewBoxUpdate(a){
         
-      let tween = this as gsap.Tween
+      const tween = this as gsap.Tween
     
         const {animVal} = tween._targets[0].viewBox
         const _x = animVal.x
@@ -593,8 +594,7 @@ export function PuzzleSpotlight(els,state){
         self.V.ticks.forEach((t,i)=>{
 
           gsap.set(t,{x: (t.xAnchor-_x)/_w*self.state.width},"<")
-          const l = self.V.labels[i] // Grabbing the label with index.
-          // @ts-ignore
+          const l = self.V.labels[i] as Label // Grabbing the label with index.
           l && gsap.set(l,{x: (t.xAnchor-_x)/_w*self.state.width-l.width/2},"<")
         })
         
@@ -673,7 +673,7 @@ export function PuzzleSpotlight(els,state){
         let _message = "State validation failed";
     
     
-        let customIncrementsValid = true;
+        const customIncrementsValid = true;
 
     
         const minLessThanMax = this.state.min < this.state.max;
@@ -774,12 +774,13 @@ export function PuzzleSpotlight(els,state){
         if (this.state.tickStepSize){
           console.log("this.state.tickStepSize",this.state.tickStepSize)
     
-          let sum = this.state.tickStepSize + this.state.min
-          console.log("start sum,this.state.min",sum,this.state.min)
+          let sum: number = Number(this.state.tickStepSize) + Number(this.state.min)
+          console.log("start sum,this.state.min",typeof(sum),typeof(this.state.min))
           do {
+            console.log("doing")
             const _label = this.state.labelTicks ? sum : null
             this.markings.push({location: sum,label: _label,reduce: this.state.reduceTicks})
-            sum += this.state.tickStepSize
+            sum += Number(this.state.tickStepSize)
             console.log("sum",sum,this.state.max)
           } while (sum < this.state.max)
       }
@@ -879,7 +880,7 @@ export function PuzzleSpotlight(els,state){
     
       initLayoutParams() {
         // Legacy name change:
-        let steps = {major: 100,minor: 10,mini: 1}
+        const steps = {major: 100,minor: 10,mini: 1}
     
         // State Variables
         this.feedbackComplete = false
@@ -1042,7 +1043,7 @@ export function PuzzleSpotlight(els,state){
       goButtonClicked(e) {
         console.log("this",this)
         console.log("self",self.goBtnURL)
-        let btn = this as any
+        const btn = this as any
 
         if (self.feedbackComplete) {
           btn.style.backgroundImage = `url(${self.goBtnURL})`;
@@ -1054,7 +1055,7 @@ export function PuzzleSpotlight(els,state){
         } else {
           console.log("You can't click me!")
         } 
-      };
+      }
     
       // Object Functions
 

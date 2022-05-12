@@ -24,7 +24,7 @@ export class SpotlightComponent implements AfterViewInit {
   private target: number = null 
 
   @Input()
-  private min: number = 0
+  private min = 0
 
   @Input()
   private max: number = null 
@@ -38,10 +38,10 @@ export class SpotlightComponent implements AfterViewInit {
   // #region Reporting Values
 
   @Input()
-  private value: string = "" // previousy ng-model aka Question.FreeFormAnswers[0]
+  private value = "" // previousy ng-model aka Question.FreeFormAnswers[0]
 
   @Input()
-  private state: string = ""
+  private state = ""
 
   // #endregion
 
@@ -49,13 +49,13 @@ export class SpotlightComponent implements AfterViewInit {
   private decimals: number = null 
 
   @Input()
-  private tickStepSize: number = 4 
+  private tickStepSize = 4 
 
   @Input()
   private labelTicks: boolean = null 
 
   @Input()
-  private timeStep: number = 1 
+  private timeStep = 1 
 
   @Input()
   private hints: Array<number> = []
@@ -64,22 +64,22 @@ export class SpotlightComponent implements AfterViewInit {
   private majorJumps: number = null 
 
   @Input()
-  private padding: number = 0.10
+  private padding = 0.10
 
   @Input()
-  private reduceTicks: boolean = false
+  private reduceTicks = false
 
   @Input()
-  private zoom: boolean = true
+  private zoom = true
 
   @Input()
-  private reduceHints: boolean = false
+  private reduceHints = false
 
   @Input()
-  private reduceEndpoints: boolean = false
+  private reduceEndpoints = false
 
   @Input()
-  private reduceTarget: boolean = false
+  private reduceTarget = false
 
   // #endregion
 
