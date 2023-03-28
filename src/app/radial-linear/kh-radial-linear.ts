@@ -81,6 +81,7 @@ export class RadialLinear {
   leave: SVGUseElement
   zoom: SVGUseElement
   ctls: SVGUseElement
+  batteryInEditing: Battery
 
 
   timeline: gsap.timeline
@@ -149,8 +150,9 @@ export class RadialLinear {
   
       this.arena.appendChild(b)
       // MOOO this data might change
-      const bData = this.state.batteries[i]
+      const bData = b.data
       const {numerator,denominator} = bData
+      console.log("b.datas",bData)
       const frac = numerator/denominator
       const currentRotation = gsap.getProperty(b.wheel,"rotation")
       
@@ -192,10 +194,6 @@ export class RadialLinear {
 
     // Update Battery State 
 
-
-    // Direction is boolean. (Forward,true,backward, false)
-    let _color = setup.direction ? this.COLOR_BATTERY_FORWARD : this.COLOR_BATTERY_BACKWARD
-
     let g = document.createElementNS(svgns,"g") as Battery
     g.data = setup
 
@@ -212,20 +210,12 @@ export class RadialLinear {
     gsap.set(_texture,{x:-38,y:-40})
 
     const _circumfrence = 2*this.BATTERY_RADIUS*Math.PI
-    const arc = _circumfrence*(1-num/den)
 
     let _ribbon = document.createElementNS(svgns,"circle")
 
     // This works for backwardsƒgetBa
 
     // MOOOOO Hardcoding
-    if (setup.direction){
-      gsap.set(_wrench,{rotation: -num/den*360})
-      gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: -1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
-    } else {
-      gsap.set(_wrench,{rotation: num/den*360})
-      gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
-    }
     
 
     g.fraction = this.getFraction(this.BATTERY_RADIUS+this.RIBBON_WIDTH/2,0.65,setup.denominator)
@@ -247,10 +237,23 @@ export class RadialLinear {
     g.appendChild(_wheel)
 
     g.setFraction = (a,b)=>{
-      console.log(g,"g.data")
       g.data.numerator = a
       g.data.denominator = b
       g.fraction.setTicks(b)
+
+          // Direction is boolean. (Forward,true,backward, false)
+    let _color = setup.direction ? this.COLOR_BATTERY_FORWARD : this.COLOR_BATTERY_BACKWARD
+
+
+      const arc = _circumfrence*(1-a/b)
+
+      if (setup.direction){
+        gsap.set(_wrench,{rotation: -a/b*360})
+        gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: -1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
+      } else {
+        gsap.set(_wrench,{rotation: a/b*360})
+        gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: 1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
+      }
     }
 
     g.setFraction(num,den)
@@ -335,6 +338,7 @@ export class RadialLinear {
 
   feedbackPlay(){
     console.log("feedback")
+    this.buildTimeline()
     this.timeline.play()
   }
 
@@ -349,6 +353,7 @@ export class RadialLinear {
     gsap.set(this.controlPad,{x: bx-138.5})
     gsap.to(this.controlPad,{y: 400})
     b.editing = true
+    this.batteryInEditing = b
     } 
   }
 
@@ -360,6 +365,29 @@ export class RadialLinear {
   controlPadDown(e){
     let _id = gsap.getProperty(e.target,"id")
     console.log("id",_id)
+    let num = this.batteryInEditing.data.numerator
+    let den = this.batteryInEditing.data.denominator
+    let direction = this.batteryInEditing.direction
+
+    switch(_id){
+      case "right": 
+        num++
+        break;
+      case "left": 
+        num--
+        break;
+      case "up": 
+        den++
+        break;
+      case "down": 
+        den--
+        break;
+      case "center":
+        this.batteryInEditing.data.direction = !this.batteryInEditing.data.direction
+      default: 
+        console.log('no valid identifier found')
+      }
+      this.batteryInEditing.setFraction(num,den)
 
   }
 
@@ -384,18 +412,13 @@ export class RadialLinear {
 
   feedbackPause(e){
 
-    console.log("this,e",this,e)
-
-    console.log("boundingbox",e.target.getBBox())
 
     this.point.x = e.clientX;
     this.point.y = e.clientY;
-    console.log(e.clientX,e.clientY)
 
     // The cursor point, translated into svg coordinates
     var cursorpt =  this.point.matrixTransform(this.arena.getScreenCTM().inverse());
-    console.log("(" + cursorpt.x + ", " + cursorpt.y + ")");
-  
+   
   }
 
 
@@ -417,6 +440,12 @@ export class RadialLinear {
     let numOfBatteries = this.state.batteries.length
     let batteryLength = 100*(numOfBatteries-1)
     let batteryX = 1280/2 - batteryLength/2
+
+    this.ground = document.createElementNS(svgns,"use")
+    this.ground.setAttribute("href","#ground")
+    gsap.set(this.ground,{y: this.NUMBER_LINE_Y,scaleY: 1.55})
+    
+    this.arena.appendChild(this.ground)
 
     this.state.batteries.forEach((e,i) => {
       let b = this.getBattery(e)
@@ -463,12 +492,7 @@ export class RadialLinear {
 
 
 
-    this.ground = document.createElementNS(svgns,"use")
-    this.ground.setAttribute("href","#ground")
-    gsap.set(this.ground,{y: this.NUMBER_LINE_Y,scaleY: 1.55})
-    
     this.arena.appendChild(this.robot)
-    this.arena.appendChild(this.ground)
 
 
     let controlsImage = document.createElementNS(svgns,"use")
@@ -519,15 +543,13 @@ export class RadialLinear {
 
     this.ctltimeline.to(this.overlay,{duration: 1,x: 0})
 
-    this.buildTimeline()
+    //this.buildTimeline()
     this.createTicks()
     this.drawTicks()
 
 
     this.controlPad.addEventListener('pointerdown',this.controlPadDown.bind(this))
     this.arena.appendChild(this.controlPad)
-
-    this.batteries[0].setFraction(1,4)
 
   }
 }
