@@ -7,6 +7,7 @@ import { TstDotConnectComponent } from './tst-dot-connect/tst-dot-connect.compon
 import { ContainerComponent } from './container/container.component';
 import { SpotlightComponent } from './spotlight/spotlight.component';
 import { TestcomponentComponent } from './testcomponent/testcomponent.component';
+import { RadialLinearComponent } from './radial-linear/radial-linear.component';
 
 @NgModule({
   declarations: [
@@ -15,6 +16,7 @@ import { TestcomponentComponent } from './testcomponent/testcomponent.component'
     ContainerComponent,
     SpotlightComponent,
     TestcomponentComponent,
+    RadialLinearComponent,
   ],
   imports: [
     BrowserModule,
