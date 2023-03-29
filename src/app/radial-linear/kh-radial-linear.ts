@@ -82,14 +82,21 @@ export class RadialLinear {
   zoom: SVGUseElement
   ctls: SVGUseElement
   batteryInEditing: Battery
+  background: SVGGElement
+  spaceShip: SVGUseElement
+  beam: SVGUseElement
 
 
   timeline: gsap.timeline
   ctltimeline: gsap.timeline
+  wandtimeline: gsap.timeline
+  shiptimeline: gsap.timeline
+  introtimeline: gsap.timeline
   origin: any
   state: State
   editArea: any
   point: SVGPoint
+
 
 
   // Constants
@@ -113,13 +120,17 @@ export class RadialLinear {
     this.assets = dom.assets 
     this.overlay = dom.overlay
     this.controlPad = dom.controlPad
+    this.background = dom.background
     this.state = state as State
 
     // Constants
     this.editArea = {x: 100,y: 80,width: 250,height: 140}
     this.state = state as State
     this.timeline = gsap.timeline({paused: true})
+    this.wandtimeline = gsap.timeline({paused: true})
     this.ctltimeline = gsap.timeline({paused: true})
+    this.shiptimeline = gsap.timeline({paused: true})
+    this.introtimeline = gsap.timeline({paused: true})
     this.point = this.arena.createSVGPoint()
 
     this.init()
@@ -149,10 +160,9 @@ export class RadialLinear {
       // Testing Functions 
   
       this.arena.appendChild(b)
-      // MOOO this data might change
+      // MOOO this data might change (fixed)
       const bData = b.data
       const {numerator,denominator} = bData
-      console.log("b.datas",bData)
       const frac = numerator/denominator
       const currentRotation = gsap.getProperty(b.wheel,"rotation")
       
@@ -166,20 +176,22 @@ export class RadialLinear {
       this.timeline.to(b.texture,{duration: ts/4,alpha: 0},"<")
       this.timeline.to(b.wrench,{alpha: 1,duration: ts/4})
 
+      // Adjusted time step so small fractions go at the same rate as large ones. 
+      const adjts = frac*ts
 
       if (bData.direction == true){
-        this.timeline.to(b,{duration: ts,x: head+frac*this.CIRCUMFRENCE,ease: Linear.easeNone}) 
-        this.timeline.to(this.robot,{duration: ts,x: head + frac*this.CIRCUMFRENCE - this.PADDING,ease: Linear.easeNone},"<") 
-        this.timeline.to(b.wheel,{duration: ts,rotation: currentRotation+frac*360,ease: Linear.easeNone},"<")
+        this.timeline.to(b,{duration: adjts,x: head+frac*this.CIRCUMFRENCE,ease: Linear.easeNone}) 
+        this.timeline.to(this.robot,{duration: adjts,x: head + frac*this.CIRCUMFRENCE - this.PADDING,ease: Linear.easeNone},"<") 
+        this.timeline.to(b.wheel,{duration: adjts,rotation: currentRotation+frac*360,ease: Linear.easeNone},"<")
         head = head + frac*this.CIRCUMFRENCE
       } else {
-        this.timeline.to(b,{duration: ts,x: head-frac*this.CIRCUMFRENCE,ease: Linear.easeNone}) 
-        this.timeline.to(this.robot,{duration: ts,x: head - frac*this.CIRCUMFRENCE - this.PADDING,ease: Linear.easeNone},"<") 
-        this.timeline.to(b.wheel,{duration: ts,rotation: currentRotation-frac*360,ease: Linear.easeNone},"<")
+        this.timeline.to(b,{duration: adjts,x: head-frac*this.CIRCUMFRENCE,ease: Linear.easeNone}) 
+        this.timeline.to(this.robot,{duration: adjts,x: head - frac*this.CIRCUMFRENCE - this.PADDING,ease: Linear.easeNone},"<") 
+        this.timeline.to(b.wheel,{duration: adjts,rotation: currentRotation-frac*360,ease: Linear.easeNone},"<")
         head = head - frac*this.CIRCUMFRENCE
       }
 
-      this.timeline.to(b.ribbon,{duration: ts,strokeDashoffset: bc,ease: Linear.easeNone},"<")
+      this.timeline.to(b.ribbon,{duration: adjts,strokeDashoffset: bc,ease: Linear.easeNone},"<")
 
       this.timeline.to(b.wheel,{alpha: 0})
 
@@ -206,7 +218,7 @@ export class RadialLinear {
     _wrench.setAttribute("href","#wrench")
     gsap.set(_wrench,{alpha: 0,scale: 0.85,transformOrigin: "50% 50%",x:-36,y:-35})
 
-    // MOOOOOOOO - Manual texture offset. Based on geometry of the battery.
+    // MOOOOOOOO - Manual texture offset. Based on geometry of the battery/gear.
     gsap.set(_texture,{x:-38,y:-40})
 
     const _circumfrence = 2*this.BATTERY_RADIUS*Math.PI
@@ -310,13 +322,11 @@ export class RadialLinear {
     g.appendChild(g.outerCircle)
 
     g.setTicks = (den)=> {
-      console.log("setting ticks")
+
       g.ticks.forEach((t,i)=>{
         if (i>den){
-          console.log("removing ticks")
-          gsap.set(t,{rotation: offset + 0})
+          gsap.set(t,{rotation: offset})
         } else {
-          console.log("adding ticks")
           g.appendChild(t)
           gsap.set(t,{rotation: offset + 360/den*i})
         }
@@ -328,23 +338,18 @@ export class RadialLinear {
 
   // UI Actions 
 
-  presentControls(){
 
-  }
-
-  batteryFromTo(from,to){
-
-  }
 
   feedbackPlay(){
-    console.log("feedback")
     this.buildTimeline()
-    this.timeline.play()
+    setTimeout(()=>{
+      this.timeline.play()
+    },1000)
   }
 
   focusBattery(e,b){
   if (!b.editing) {
-    this.arena.appendChild(this.curtain)
+    gsap.set(this.curtain,{pointerEvents: "auto"})
     this.arena.appendChild(b)
     this.arena.appendChild(this.controlPad)
     let bx = gsap.getProperty(b,"x")
@@ -357,38 +362,33 @@ export class RadialLinear {
     } 
   }
 
-  // Callbacks
-  onAbandonComplete(){
-    this.arena.removeChild(this.curtain)
-  }
 
   controlPadDown(e){
     let _id = gsap.getProperty(e.target,"id")
     console.log("id",_id)
     let num = this.batteryInEditing.data.numerator
     let den = this.batteryInEditing.data.denominator
-    let direction = this.batteryInEditing.direction
 
     switch(_id){
       case "right": 
-        num++
+        num = (num < den) ? num + 1 : num
         break;
       case "left": 
-        num--
+        num = (num > 0) ? num - 1 : num
         break;
       case "up": 
-        den++
+        den = den < 12 ? den + 1 : den
         break;
       case "down": 
-        den--
+        den = den > 0 ? den -1 : den 
         break;
       case "center":
         this.batteryInEditing.data.direction = !this.batteryInEditing.data.direction
       default: 
         console.log('no valid identifier found')
       }
-      this.batteryInEditing.setFraction(num,den)
 
+      this.batteryInEditing.setFraction(num,den)
   }
 
   // On curtain pointer down. Should abaondon all editing. 
@@ -397,7 +397,8 @@ export class RadialLinear {
       gsap.to(b,{scale: 1,y: this.NUMBER_LINE_Y+75})
       b.editing = false
     })
-    gsap.to(this.curtain,{alpha: 0,onComplete: this.onAbandonComplete.bind(this)})
+    gsap.to(this.curtain,{alpha: 0})
+    gsap.set(this.curtain,{pointerEvents: "none"})
     gsap.to(this.controlPad,{y: 1000})
   }
 
@@ -432,6 +433,28 @@ export class RadialLinear {
     })
   }
 
+  buildWandTimeline(){
+      this.wandtimeline.clear()
+      this.wandtimeline.to(this.curtain,{duration: 0.5,alpha: 0.5})
+      this.wandtimeline.to(this.batteries,{duration: 0.35,scaleX: 1.3,scaleY: 0.7},"<")
+      this.wandtimeline.to(this.batteries,{duration: 0.35,scaleX: 0.7,scaleY: 1.3})
+      this.wandtimeline.to(this.batteries,{duration: 1.5,scale: 1,ease: "elastic"})
+      this.wandtimeline.to(this.curtain,{alpha: 0})
+
+  }
+
+  buildSpaceShipTimeline(to: number){
+    gsap.set(this.beam,{y: -5,x: to+117})
+    this.shiptimeline.to(this.spaceShip,{duration: 1,y: 0})
+    this.shiptimeline.to(this.spaceShip,{duration: 2.5,x: to,ease: "elastic"})
+    this.shiptimeline.to(this.beam,{duration: 1,scaleY: 1})
+  }
+
+  setupWand(){
+    this.batteries.forEach(b=>{
+    this.arena.appendChild(b)})
+  }
+
 
   init(){
 
@@ -463,15 +486,29 @@ export class RadialLinear {
     this.leave = document.createElementNS(svgns,"use")
     this.zoom = document.createElementNS(svgns,"use")
     this.ctls = document.createElementNS(svgns,"use")
+    this.spaceShip = document.createElementNS(svgns,"use")
+    this.beam = document.createElementNS(svgns,"use")
+
 
 
     this.leave.setAttribute("href","#leave")
     this.zoom.setAttribute("href","#zoom")
     this.ctls.setAttribute("href","#fractioncontrols")
+    this.spaceShip.setAttribute("href","#spaceship")
+    this.beam.setAttribute("href","#beam")
 
     this.overlay.appendChild(this.leave)
     this.overlay.appendChild(this.zoom)
     this.overlay.appendChild(this.ctls)
+    this.arena.appendChild(this.beam)
+    this.arena.appendChild(this.spaceShip)
+
+    gsap.set(this.spaceShip,{y: -300})
+    gsap.set(this.beam,{scaleY: 0})
+
+    setTimeout(() => {
+      console.log("spaceship",gsap.getProperty(this.spaceShip,"width"))
+    },2000);
 
     gsap.set([this.leave,this.zoom,this.ctls],{scale: 4,transformOrigin: "50% 50%"})
     gsap.set(this.leave,{x: 50,y: 20})
@@ -489,10 +526,17 @@ export class RadialLinear {
       this.feedbackPlay()
     })
     
+    this.background.addEventListener('pointerdown',()=>{
+      console.log('restarting wand timeline')
+      this.setupWand()
+      this.wandtimeline.restart()
+    })
 
 
 
     this.arena.appendChild(this.robot)
+
+    
 
 
     let controlsImage = document.createElementNS(svgns,"use")
@@ -500,40 +544,15 @@ export class RadialLinear {
 
 
     this.curtain = document.createElementNS(svgns,"rect")
-    gsap.set(this.curtain,{width: 1280,height: 720,fill: "#000000",alpha:0.7})
+    gsap.set(this.curtain,{pointerEvents: "none",width: 1280,height: 720,fill: "#000000",alpha:0})
 
     this.curtain.addEventListener('pointerdown',()=>this.abandonEditing())
-
-
-
-
+    this.arena.appendChild(this.curtain)
+    
 
     let nl = document.createElementNS(svgns,"line")
     gsap.set(nl,{attr: {y1: 0,x1:0,y2: 0,x2:1280},strokeWidth:4,y: this.NUMBER_LINE_Y,stroke: "#ffffff"})
-
-
     this.arena.appendChild(nl)
-
-
-
-    this.zoom.addEventListener('pointerdown',()=>{
-      gsap.set(this.arena,{attr: {viewBox: "0 0 1280 720"}})
-      gsap.set([this.leave,this.ctls],{alpha: 0})
-
-    })
-
-    this.zoom.addEventListener('pointerup',()=>{
-      gsap.set(this.arena,{attr: {viewBox: vBox}})
-
-      gsap.set([this.leave,this.ctls],{alpha: 1})
-    })
-
-    this.leave.addEventListener('pointerup',()=>{
-      gsap.set(this.arena,{attr: {viewBox: "0 0 1280 720"}})
-
-      gsap.set([this.zoom,this.leave,this.ctls],{scale: 0})
- 
-    })
 
     this.controlPad.appendChild(controlsImage)
     gsap.set(controlsImage,{pointerEvents: "none"})
@@ -543,13 +562,19 @@ export class RadialLinear {
 
     this.ctltimeline.to(this.overlay,{duration: 1,x: 0})
 
-    //this.buildTimeline()
+    this.buildWandTimeline()
+    this.buildSpaceShipTimeline(640)
     this.createTicks()
     this.drawTicks()
 
 
     this.controlPad.addEventListener('pointerdown',this.controlPadDown.bind(this))
     this.arena.appendChild(this.controlPad)
+
+    setTimeout(()=>{
+      this.introtimeline.add(this.shiptimeline.play())
+      this.introtimeline.play()
+    },5000)
 
   }
 }

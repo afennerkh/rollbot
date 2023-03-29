@@ -12,6 +12,7 @@ export class RadialLinearComponent implements AfterViewInit {
   @ViewChild("controlPad") public controlPad?: ElementRef<SVGSVGElement>;
   @ViewChild("controls") public controls?: ElementRef<HTMLElement>;
   @ViewChild("assets") public assets?: ElementRef<HTMLElement>;
+  @ViewChild("elbackground") public background?: ElementRef<HTMLElement>;
 
 
   constructor() {}
@@ -59,7 +60,8 @@ export class RadialLinearComponent implements AfterViewInit {
       overlay: this.overlay.nativeElement,
       controls: this.controls.nativeElement,
       assets: this.assets.nativeElement,
-      controlPad: this.controlPad.nativeElement
+      controlPad: this.controlPad.nativeElement,
+      background: this.background.nativeElement
     };
 
     let api = new RadialLinear(dom, state);
