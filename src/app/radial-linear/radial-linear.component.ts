@@ -13,6 +13,7 @@ export class RadialLinearComponent implements AfterViewInit {
   @ViewChild("controls") public controls?: ElementRef<HTMLElement>;
   @ViewChild("assets") public assets?: ElementRef<HTMLElement>;
   @ViewChild("elbackground") public background?: ElementRef<HTMLElement>;
+  @ViewChild("goButton") public goButton?: ElementRef<HTMLElement>;
 
 
   constructor() {}
@@ -26,6 +27,12 @@ export class RadialLinearComponent implements AfterViewInit {
         {
           editable: true,
           numerator: 1,
+          denominator: 2,
+          direction: true,
+        },
+        {
+          editable: true,
+          numerator: 2,
           denominator: 3,
           direction: true,
         },
@@ -37,13 +44,7 @@ export class RadialLinearComponent implements AfterViewInit {
         },
         {
           editable: true,
-          numerator: 4,
-          denominator: 4,
-          direction: true,
-        },
-        {
-          editable: true,
-          numerator: 3,
+          numerator: 1,
           denominator: 4,
           direction: false,
         },
@@ -51,7 +52,7 @@ export class RadialLinearComponent implements AfterViewInit {
       shipWidth: 0.34, // A decimal or fraction in "Number line" coordinate space.
       min: 0, // Usually zero,
       max: 3,
-      timeStep: 3,
+      timeStep: 1,
       allowPartitionEdits: true,
     };
 
@@ -61,7 +62,8 @@ export class RadialLinearComponent implements AfterViewInit {
       controls: this.controls.nativeElement,
       assets: this.assets.nativeElement,
       controlPad: this.controlPad.nativeElement,
-      background: this.background.nativeElement
+      background: this.background.nativeElement,
+      goButton: this.goButton.nativeElement
     };
 
     let api = new RadialLinear(dom, state);

@@ -7,6 +7,21 @@
    display: none;
 }
 
+.goBtn {
+    background-image: url("https://res.cloudinary.com/duim8wwno/image/upload/v1644246521/SpotlightGoBtn_eqeyvr.svg");
+    background-size: cover;
+    width: 8%;
+    padding-bottom: 8%;
+    top: 1%;
+    left: 1%;  
+    position: absolute;
+  }
+
+  .goBtn:hover {
+    scale: 1.2;
+  }
+
+
 
 .scene {
     width: 100%
