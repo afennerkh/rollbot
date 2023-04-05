@@ -1,5 +1,7 @@
-import { Component, ViewChild, ElementRef, AfterViewInit } from "@angular/core";
+import { Component, ViewChild, ElementRef,Input, AfterViewInit } from "@angular/core";
+import { ActivatedRoute } from "@angular/router";
 import { RadialLinear } from "./kh-radial-linear";
+import {Levels} from "./levels"
 
 @Component({
   selector: "app-radial-linear",
@@ -14,47 +16,16 @@ export class RadialLinearComponent implements AfterViewInit {
   @ViewChild("assets") public assets?: ElementRef<HTMLElement>;
   @ViewChild("elbackground") public background?: ElementRef<HTMLElement>;
   @ViewChild("goButton") public goButton?: ElementRef<HTMLElement>;
+  @ViewChild("nextButton") public nextButton?: ElementRef<HTMLElement>;
 
-
-  constructor() {}
+  id: string
+  constructor(private route: ActivatedRoute) {
+    
+  }
 
   ngAfterViewInit(): void {
-    const state = {
-      mode: "multiplying/combining",
-      input: "battery/ship",
-      numberLineDenominator: 1,
-      batteries: [
-        {
-          editable: true,
-          numerator: 1,
-          denominator: 2,
-          direction: true,
-        },
-        {
-          editable: true,
-          numerator: 2,
-          denominator: 3,
-          direction: true,
-        },
-        {
-          editable: true,
-          numerator: 1,
-          denominator: 4,
-          direction: false,
-        },
-        {
-          editable: true,
-          numerator: 1,
-          denominator: 4,
-          direction: false,
-        },
-      ],
-      shipWidth: 0.34, // A decimal or fraction in "Number line" coordinate space.
-      min: 0, // Usually zero,
-      max: 3,
-      timeStep: 1,
-      allowPartitionEdits: true,
-    };
+    this.id = this.route.snapshot.paramMap.get('id')
+    const puzzles = Levels[this.id] as Array<any>
 
     const dom = {
       arena: this.arenaMain.nativeElement,
@@ -63,9 +34,10 @@ export class RadialLinearComponent implements AfterViewInit {
       assets: this.assets.nativeElement,
       controlPad: this.controlPad.nativeElement,
       background: this.background.nativeElement,
-      goButton: this.goButton.nativeElement
+      goButton: this.goButton.nativeElement,
+      nextButton: this.nextButton.nativeElement
     };
 
-    let api = new RadialLinear(dom, state);
+    let api = new RadialLinear(dom, puzzles);
   }
 }

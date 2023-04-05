@@ -15,7 +15,7 @@ class Loader {
 
 // Data Interface
 
-interface BatteryData {
+interface GearData {
   editable: boolean
   numerator: number
   denominator: number 
@@ -23,7 +23,7 @@ interface BatteryData {
 }
 
 
-interface State {
+interface Puzzle {
   mode: string
   input: string
   shipWidth: number 
@@ -31,13 +31,14 @@ interface State {
   max: number
   numberLineDenominator: number
   allowPartitionEdits: boolean
-  batteries: Array<BatteryData>
+  batteries: Array<GearData>
   timeStep: number
+  shipLocation: number
 }
 
 // UI Interface
 
-interface Battery extends SVGGElement {
+interface Gear extends SVGGElement {
   wheel: SVGGElement
   ribbon: SVGCircleElement
   texture: SVGUseElement
@@ -45,8 +46,9 @@ interface Battery extends SVGGElement {
   wrench: SVGUseElement
   fraction: Fraction
   editing: boolean
-  data: BatteryData
-  setFraction: (a: number,b: number)=>void
+  data: GearData
+  inPlay: boolean
+  set: (data?: GearData) => void
 }
 
 
@@ -66,7 +68,7 @@ export class RadialLinear {
   overlay: SVGSVGElement
   controls: HTMLElement
   assets: SVGDefsElement
-  batteries: Array<Battery> = []
+  uiGears: Array<Gear> = []
   robot: SVGUseElement
   ground: SVGUseElement
   menuLeave: SVGUseElement
@@ -81,11 +83,16 @@ export class RadialLinear {
   leave: SVGUseElement
   zoom: SVGUseElement
   ctls: SVGUseElement
-  batteryInEditing: Battery
+  batteryInEditing: Gear
   background: SVGGElement
   spaceShip: SVGUseElement
   beam: SVGUseElement
+  gearPool: Array<Gear> = []
   goButton: HTMLElement
+  nextButton: HTMLElement
+
+  // Bounding Boxes
+  robotBBox: any
 
 
   timeline: gsap.timeline
@@ -93,15 +100,26 @@ export class RadialLinear {
   wandtimeline: gsap.timeline
   shiptimeline: gsap.timeline
   introtimeline: gsap.timeline
+  successtimeline: gsap.timeline
+  failtimeline: gsap.timeline
   origin: any
-  state: State
+  currentPuzzle: Puzzle
+  puzzles: Array<Puzzle>
   editArea: any
   point: SVGPoint
+  shipLocation: number
+  originalPuzzles: Array<Puzzle>
+  radioCircle: SVGCircleElement
+  numberLine: SVGGElement
+
+  // State Variables
+  puzzleIndex: number = 0
+  puzzleCount: number 
+
 
   // Transient State
   feedbackEnded: boolean = false
-
-
+  peeking: boolean = false
 
   // Constants
   PADDING: number = 110
@@ -117,7 +135,7 @@ export class RadialLinear {
   NUMBER_LINE_Y: number = 550
 
 
-  constructor(dom,state){
+  constructor(dom,puzzles){
 
     this.arena = dom.arena
     this.controls = dom.controls
@@ -126,16 +144,24 @@ export class RadialLinear {
     this.controlPad = dom.controlPad
     this.background = dom.background
     this.goButton = dom.goButton
-    this.state = state as State
+    this.nextButton = dom.nextButton
+
+    // Unadultered puzzles.
+    this.puzzles = puzzles
+
+    // Initialize puzzles
+    this.currentPuzzle = JSON.parse(JSON.stringify(this.puzzles[0]))
+    this.puzzleCount = this.puzzles.length
+    this.shipLocation = this.currentPuzzle.shipLocation
 
     // Constants
-    this.state = state as State
-    this.timeline = gsap.timeline({onComplete: this.feedbackComplete.bind(this),paused: true})
-    this.wandtimeline = gsap.timeline({paused: true})
+    this.timeline = gsap.timeline({onComplete: this.onFeedBackEnded.bind(this),paused: true})
+    this.wandtimeline = gsap.timeline({paused: true,onComplete: this.onWandComplete.bind(this)})
     this.ctltimeline = gsap.timeline({paused: true})
     this.shiptimeline = gsap.timeline({paused: true})
     this.introtimeline = gsap.timeline({paused: true})
-    this.point = this.arena.createSVGPoint()
+    this.successtimeline = gsap.timeline({paused: true})
+    this.failtimeline = gsap.timeline({paused: true})
 
     this.init()
   }
@@ -149,32 +175,100 @@ export class RadialLinear {
     return t
   }
 
-  feedbackComplete(){
-    console.log('feedback complete')
+  onFeedBackEnded(){
     gsap.set(this.arena,{pointerEvents: "none"})
     gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1665147162/RetryBtn_jhupgo.svg"})`})
     this.feedbackEnded = true
+    this.scorePuzzle()
   }
 
-  restartGame(){
-    this.timeline.clear()
-    this.resetBatteries()
-    gsap.set(this.arena,{pointerEvents: "auto"})
-    gsap.set(this.robot,{x: 0})
-    gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1644246521/SpotlightGoBtn_eqeyvr.svg"})`})
+  nextPuzzle(){
+    this.abandonEditing()
+    this.puzzleIndex = (this.puzzleIndex+1)%this.puzzleCount
+    let newPuzzle = this.getPuzzle(this.puzzleIndex)
+      this.loadPuzzle(newPuzzle)
+  }
+
+    // need "battery pool" (not to exceed a certain amount)
+  loadPuzzle(puzzle){
+
+      this.feedbackEnded = false
+      this.uiGears = []
+      this.currentPuzzle = puzzle
+  
+      let newBatteries = this.currentPuzzle.batteries
+      let numOfBatteries = this.currentPuzzle.batteries.length
+      let batteryLength = 100*(numOfBatteries-1)
+      let batteryX = 1280/2 - batteryLength/2
+  
+      // this.batteries is the pool
+      this.gearPool.forEach((b,i)=>{
+        if (i<numOfBatteries) {
+          b.data = newBatteries[i]
+          gsap.set(b,{x: batteryX + 100*i,y: this.NUMBER_LINE_Y+75,transformOrigin: "50% 50%"})
+          b.set()
+          this.arena.append(b)
+          this.uiGears.push(b)
+          b.inPlay = true
+        } else {
+          b.inPlay && this.arena.removeChild(b)
+          b.inPlay = false
+        }
+      })
+
+      // Formerly Refresh
+
+      this.wandtimeline.clear()
+      this.buildWandTimeline()
+  
+      // Reset Timelines
+      let location = this.PADDING+this.CIRCUMFRENCE*this.currentPuzzle.shipLocation
+      this.shiptimeline.clear()
+      this.buildSpaceShipTimeline(location)
+  
+      this.timeline.clear()
+  
+      // Refresh batteries
+      this.uiGears.forEach((b,i)=>{
+      
+        gsap.set(b,{scale: 1,alpha: 1,x: batteryX + 100*i,y: this.NUMBER_LINE_Y+75})
+        gsap.set([b.wheel,b.texture],{alpha: 1})
+        gsap.set(b.wheel,{scale: 1})
+        gsap.set(b.wrench,{alpha: 0})
+        b.set(b.data)
+  
+      })
+
+  
+      // Prepare Arena
+      gsap.set(this.arena,{pointerEvents: "auto"})
+      gsap.set(this.curtain,{alpha: 0,pointerEvents: "none"})
+      gsap.set(this.robot,{x: 0,y: this.NUMBER_LINE_Y-this.robotBBox.height,pointerEvents: "none"})
+      gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1644246521/SpotlightGoBtn_eqeyvr.svg"})`})
+      gsap.set(this.spaceShip,{y: -300,pointerEvents: "none"})
+      gsap.set(this.beam,{scaleY: 0,pointerEvents: "none"})
+  
+      this.drawTicks()
+      this.playShipIntro(1)
+    } 
+
+  playShipIntro(pause: number){
+    setTimeout(()=>{
+      this.shiptimeline.play()
+    },pause*1000)
   }
 
   buildTimeline(){
     // Convenience Constants: 
     const bs = this.BATTERY_SCALE
     const bc = this.BATTERY_RADIUS*2*Math.PI
-    const ts = this.state.timeStep
+    const ts = this.currentPuzzle.timeStep
 
     
-    let head = this.PADDING + this.state.min*this.CIRCUMFRENCE
+    let head = this.PADDING + this.currentPuzzle.min*this.CIRCUMFRENCE
 
 
-    this.batteries.forEach((b,i)=>{
+    this.uiGears.forEach((b,i)=>{
 
       // Testing Functions 
   
@@ -217,18 +311,17 @@ export class RadialLinear {
       this.timeline.to(b.wheel,{alpha: 0})
 
     })
-    this.timeline.onComplete = this.feedbackComplete
+    this.timeline.onComplete = this.onFeedBackEnded
   }
 
-  getBattery(setup: BatteryData){
+  getGear(setup: GearData){
 
     const num = setup.numerator
     const den = setup.denominator
 
-
     // Update Battery State 
 
-    let g = document.createElementNS(svgns,"g") as Battery
+    let g = document.createElementNS(svgns,"g") as Gear
     g.data = setup
 
     let _wheel = document.createElementNS(svgns,"g") 
@@ -247,11 +340,6 @@ export class RadialLinear {
 
     let _ribbon = document.createElementNS(svgns,"circle")
 
-    // This works for backwardsƒgetBa
-
-    // MOOOOO Hardcoding
-    
-
     g.fraction = this.getFraction(this.BATTERY_RADIUS+this.RIBBON_WIDTH/2,0.65,setup.denominator)
 
     _wheel.appendChild(g.fraction)
@@ -265,43 +353,62 @@ export class RadialLinear {
     g.wrench = _wrench
 
 
-
     g.appendChild(_texture)
     g.appendChild(_ribbon)
     g.appendChild(_wheel)
 
-    g.setFraction = (a,b)=>{
-      g.data.numerator = a
-      g.data.denominator = b
+  
+    g.set = (newData?: GearData | null)=>{
+      if (newData){
+        g.data = newData
+      }
+      const a = g.data.numerator
+      const b = g.data.denominator
+
       g.fraction.setTicks(b)
 
           // Direction is boolean. (Forward,true,backward, false)
-    let _color = setup.direction ? this.COLOR_BATTERY_FORWARD : this.COLOR_BATTERY_BACKWARD
-
+    let _color = g.data.direction ? this.COLOR_BATTERY_FORWARD : this.COLOR_BATTERY_BACKWARD
 
       const arc = _circumfrence*(1-a/b)
 
-      if (setup.direction){
+      gsap.set(g.wheel,{rotation: 0})
+
+      if (g.data.direction){
         gsap.set(_wrench,{rotation: -a/b*360})
-        gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: -1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
+        gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: -1,scaleX: 1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
       } else {
         gsap.set(_wrench,{rotation: a/b*360})
-        gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: 1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
+        gsap.set(_ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: 1,scaleX: 1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
       }
     }
 
-    g.setFraction(num,den)
+    g.set()
 
     return g
   }
 
 
   createTicks() {
-    let n = this.state.max*this.state.numberLineDenominator
-    for(let i=0;i<=n;i++){
+    for(let i=0;i<=26;i++){
       let _t = this.getTick()
       this.ticks.push(_t)
     }
+  }
+
+  drawTicks(){
+    const step = this.CIRCUMFRENCE/this.currentPuzzle.numberLineDenominator
+    this.ticks.forEach((t,i)=>{
+      if (i>this.currentPuzzle.numberLineDenominator*3){
+        gsap.set(t,{scaleX:1,scaleY:1,alpha : 0})
+      }
+      else if (i%this.currentPuzzle.numberLineDenominator === 0 ){
+        gsap.set(t,{alpha: 1,scaleX: 1.2,scaleY: 1.3,x: this.PADDING+i*step,y: this.NUMBER_LINE_Y})
+      } else {
+        gsap.set(t,{alpha: 1,scaleY: 0.8,x: this.PADDING+i*step,y: this.NUMBER_LINE_Y})
+      }
+      this.arena.appendChild(t)
+    })
   }
 
 
@@ -346,7 +453,6 @@ export class RadialLinear {
     g.setTicks = (den)=> {
 
       g.ticks.forEach((t,i)=>{
-        console.log("den",den)
        if (den == 1) {
           gsap.set(t,{alpha: 0})
        } else if (i>den){
@@ -372,25 +478,36 @@ export class RadialLinear {
     },1000)
   }
 
-  focusBattery(e,b){
-  if (!b.editing) {
-    gsap.set(this.curtain,{pointerEvents: "auto"})
-    this.arena.appendChild(b)
-    this.arena.appendChild(this.controlPad)
-    let bx = gsap.getProperty(b,"x")
-    gsap.to(b,{scale: 2,y: this.NUMBER_LINE_Y-250})
-    gsap.to(this.curtain,{alpha: 0.5})
-    gsap.set(this.controlPad,{x: bx-138.5})
-    gsap.to(this.controlPad,{y: 400})
-    b.editing = true
-    this.batteryInEditing = b
+  focusBattery(e,i){
+      let b = this.uiGears[i]
+  
+      this.wandtimeline.kill()
+    
+
+    if (!b.editing && b.data.editable) {
+        gsap.set(this.curtain,{pointerEvents: "auto"})
+        this.arena.appendChild(b)
+        this.arena.appendChild(this.controlPad)
+        let bx = gsap.getProperty(b,"x")
+        gsap.to(b,{scale: 2,y: this.NUMBER_LINE_Y-250,transformOrigin: "50% 50%"})
+        gsap.to(this.curtain,{alpha: 0.5})
+        gsap.set(this.controlPad,{x: bx-138.5})
+        gsap.to(this.controlPad,{y: 400})
+        b.editing = true
+        this.peeking = false
+        this.batteryInEditing = b
+    } else if (!b.data.editable) {
+      this.peeking = true
+        this.arena.appendChild(b)
+        gsap.set(b,{scale: 1, rotation: 0,transformOrigin: "50% 100%"})
+        b.editing = false
+        gsap.set(b,{scale: 3})
     } 
   }
 
 
   controlPadDown(e){
     let _id = gsap.getProperty(e.target,"id")
-    console.log("id",_id)
     let num = this.batteryInEditing.data.numerator
     let den = this.batteryInEditing.data.denominator
 
@@ -411,20 +528,20 @@ export class RadialLinear {
       } else {
         den = (den > 0) ? den -1 : den 
       }
-
         break;
       case "center":
         this.batteryInEditing.data.direction = !this.batteryInEditing.data.direction
       default: 
         console.log('no valid identifier found')
       }
-
-      this.batteryInEditing.setFraction(num,den)
+      this.batteryInEditing.data.numerator = num 
+      this.batteryInEditing.data.denominator = den
+      this.batteryInEditing.set()
   }
 
   // On curtain pointer down. Should abaondon all editing. 
   abandonEditing(){
-    this.batteries.forEach(b=>{
+    this.uiGears.forEach(b=>{
       gsap.to(b,{scale: 1,y: this.NUMBER_LINE_Y+75,onComplete: ()=>gsap.set(this.curtain,{pointerEvents: "none"})})
       b.editing = false
     })
@@ -432,159 +549,222 @@ export class RadialLinear {
     gsap.to(this.controlPad,{y: 1000})
   }
 
-  resetBatteries(){
-    let numOfBatteries = this.state.batteries.length
+
+  // Assumes that the feedback has been completed
+  refreshBatteries(){
+    let numOfBatteries = this.currentPuzzle.batteries.length
     let batteryLength = 100*(numOfBatteries-1)
     let batteryX = 1280/2 - batteryLength/2
-    const _circumfrence = 2*this.BATTERY_RADIUS*Math.PI
-  
 
-
-
-    this.batteries.forEach((b,i)=>{
-      let num = b.data.numerator
-      let den = b.data.denominator
-      const currentRotation = gsap.getProperty(b.wheel,"rotation")
+    this.uiGears.forEach((b,i)=>{
       
-
-      let _color = b.data.direction ? this.COLOR_BATTERY_FORWARD : this.COLOR_BATTERY_BACKWARD
-  
-      const arc = _circumfrence*(1-num/den)
-
       gsap.set(b,{scale: 1,alpha: 1,x: batteryX + 100*i,y: this.NUMBER_LINE_Y+75})
       gsap.set([b.wheel,b.texture],{alpha: 1})
       gsap.set(b.wheel,{scale: 1})
       gsap.set(b.wrench,{alpha: 0})
-      b.setFraction(b.data.numerator,b.data.denominator)
+      b.set(b.data)
 
-
-
-
-      if (b.data.direction){
-        console.log("rotation",num,den)
-        gsap.set(b.wheel,{rotation: currentRotation-num/den*360})
-        gsap.set(b.ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: -1,scaleX: 1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
-      } else {
-        gsap.set(b.wheel,{rotation: currentRotation+num/den*360})
-        gsap.set(b.ribbon,{attr: {r: this.BATTERY_RADIUS},scaleY: 1,scaleX: 1,rotation: 90,stroke: _color,strokeWidth: 10,strokeDashoffset: arc,strokeDasharray: _circumfrence,fillOpacity: 0})
-      }
     })
   }
 
-  feedbackReset(){}
-
-
-
-
   feedbackPause(e){
-    this.timeline
-   
+    this.timeline.pause()
   }
-
 
   // Drawing Functions
 
-  drawTicks(){
-    const step = this.CIRCUMFRENCE/this.state.numberLineDenominator
-    this.ticks.forEach((t,i)=>{
-      gsap.set(t,{x: this.PADDING+i*step,y: this.NUMBER_LINE_Y})
-      this.arena.appendChild(t)
-    })
-  }
 
   buildWandTimeline(){
+      const editableBatteries = this.uiGears.filter(e=>e.data.editable == true && this.arena.appendChild(e))
       this.wandtimeline.clear()
       this.wandtimeline.to(this.curtain,{duration: 0.5,alpha: 0.5})
-      this.wandtimeline.to(this.batteries,{duration: 0.35,scaleX: 1.3,scaleY: 0.7},"<")
-      this.wandtimeline.to(this.batteries,{duration: 0.35,scaleX: 0.7,scaleY: 1.3})
-      this.wandtimeline.to(this.batteries,{duration: 1.5,scale: 1,ease: "elastic"})
+      this.wandtimeline.to(editableBatteries,{duration: 0.35,scaleX: 1.3,scaleY: 0.7},"<")
+      this.wandtimeline.to(editableBatteries,{duration: 0.35,scaleX: 0.7,scaleY: 1.3})
+      this.wandtimeline.to(editableBatteries,{duration: 0.8,scale: 1,ease: "elastic"})
+      this.wandtimeline.pause()
   }
+
+
+
+
 
   buildSpaceShipTimeline(to: number){
-    gsap.set(this.beam,{y: -5,x: to+117})
+    let beamBox = this.beam.getBBox()
+    let shipBox= this.spaceShip.getBBox()
+    let w = this.currentPuzzle.shipWidth*this.CIRCUMFRENCE
+    let s = w/beamBox.width
+
+
+    this.shiptimeline.clear()
+    gsap.set(this.spaceShip,{x: 0,y: -200,scale: 1})
+    gsap.set(this.beam,{scaleX: s,y: -7,x: to-w/2,scaleY: 0})
     this.shiptimeline.to(this.spaceShip,{duration: 1,y: 0})
-    this.shiptimeline.to(this.spaceShip,{duration: 2.5,x: to,ease: "elastic"})
+    this.shiptimeline.to(this.spaceShip,{duration: 2.5,x: to-shipBox.width/2,ease: "elastic"})
     this.shiptimeline.to(this.beam,{duration: 1,scaleY: 1})
+    this.shiptimeline.to(this.spaceShip,{duration: 1,y: -200},"<")
   }
 
-  setupWand(){
-    gsap.set(this.curtain,{pointerEvents: "auto"})
-    this.batteries.forEach(b=>{
-    this.arena.appendChild(b)})
+
+  getPuzzle(index){
+    return JSON.parse(JSON.stringify(this.puzzles[index]))
   }
+
+  scorePuzzle(){
+    let rbox = this.robot.getBBox()
+    let rx = gsap.getProperty(this.robot,"x")
+    let ry = gsap.getProperty(this.robot,"y")
+
+    // new score method
+
+    let valMin = this.currentPuzzle.shipLocation-this.currentPuzzle.shipWidth/2
+    let valMax = this.currentPuzzle.shipLocation+this.currentPuzzle.shipWidth/2
+    let centerVal = rx/this.CIRCUMFRENCE
+    let centerX = rx+this.PADDING 
+
+    this.successtimeline.clear()
+
+    if (centerVal<=valMax && centerVal>=valMin){
+       this.successtimeline.to(this.robot,{y: -rbox.height,duration: 2.5})
+       this.successtimeline.to(this.beam,{scaleY: 0,duration: 0.5})
+       this.successtimeline.to(this.spaceShip,{duration: 1,y: 250})
+       this.successtimeline.to(this.spaceShip,{duration: 1.5,x: 200,y: 100,ease: "elastic"})
+       this.successtimeline.to(this.spaceShip,{duration: 0.7,scale: 0},"<")
+    } else {
+      gsap.set(this.radioCircle,{x: centerX,y: ry,scale: 0,alpha: 1})
+      this.successtimeline.to(this.radioCircle,{scale: 20,alpha: 0,duration: 1})
+      this.successtimeline.set(this.radioCircle,{scale: 1,alpha: 1})
+      this.successtimeline.to(this.radioCircle,{scale: 20,alpha: 0,duration: 1})
+      this.successtimeline.set(this.radioCircle,{scale: 1,alpha: 1})
+      this.successtimeline.to(this.radioCircle,{scale: 20,alpha: 0,duration: 1})
+      this.successtimeline.set(this.radioCircle,{scale: 1,alpha: 1})
+      this.successtimeline.to(this.radioCircle,{scale: 20,alpha: 0,duration: 1})
+      this.successtimeline.set(this.radioCircle,{scale: 0,alpha: 1})
+    }
+
+    this.successtimeline.play()
+  }
+
+  onWandComplete(){
+    gsap.set(this.curtain,{pointerEvents: "auto"})
+  }
+
+  goButtonClicked(){
+    if (this.feedbackEnded){
+      let p = this.getPuzzle(this.puzzleIndex%this.puzzleCount)
+      this.loadPuzzle(p)
+      this.feedbackEnded = false
+      this.playShipIntro(1.5)
+    } else {
+      gsap.set(this.goButton,{pointerEvents: "none"})
+      gsap.set(this.arena,{pointerEvents: "none"})
+      this.feedbackPlay()
+    }
+  }
+
+
+
 
 
   init(){
 
-
-
-    // Constants
-    let numOfBatteries = this.state.batteries.length
+    // ------- CONSTANTS ----------
+    let numOfBatteries = this.currentPuzzle.batteries.length
     let batteryLength = 100*(numOfBatteries-1)
     let batteryX = 1280/2 - batteryLength/2
 
+    // ------- CREATE ----------
 
-    // Scenery
-    this.ground = document.createElementNS(svgns,"use")
-    this.ground.setAttribute("href","#ground")
-    gsap.set(this.ground,{y: this.NUMBER_LINE_Y,scaleY: 1.55})
-    this.arena.appendChild(this.ground)
+    // Radio Circle 
+    this.radioCircle = document.createElementNS(svgns,"circle")
 
 
-    
-    this.state.batteries.forEach((e,i) => {
-      let b = this.getBattery(e)
-      this.arena.appendChild(b)
+    // Gears
+    let dum = this.currentPuzzle.batteries[0]
+    for (let i = 0;i<6;i++){
+      let g = this.getGear(dum)
+      gsap.set(g,{transformOrigin: "50% 50%"})
+      this.gearPool.push(g)
+      g.addEventListener('pointerdown',e=>this.focusBattery(e,i))
+    }
+
+    // Gears (Formerly Battery)
+    this.currentPuzzle.batteries.forEach((d,i) => {
+      let b = this.gearPool[i]
+      b.set(d)
       gsap.set(b,{transformOrigin: "50% 50%",x: batteryX + 100*i,y: this.NUMBER_LINE_Y+75})
-      this.batteries.push(b)
-      b.addEventListener('pointerdown',e=>this.focusBattery(e,b))
+      this.uiGears.push(b)
     });
 
-
-    // SpaceShip and Beam
-    this.spaceShip = document.createElementNS(svgns,"use")
-    this.beam = document.createElementNS(svgns,"use")
-
-    this.spaceShip.setAttribute("href","#spaceship")
-    this.beam.setAttribute("href","#beam")
-
-    this.arena.appendChild(this.beam)
-    this.arena.appendChild(this.spaceShip)
-
-    gsap.set(this.spaceShip,{y: -300,pointerEvents: "none"})
-    gsap.set(this.beam,{scaleY: 0,pointerEvents: "none"})
-
+    // Ground
+    this.ground = document.createElementNS(svgns,"use")
+    this.ground.setAttribute("href","#ground")
 
     // Robot
     this.robot = document.createElementNS(svgns,"use")
-    this.robot.setAttribute("href","#robot")
-    gsap.set(this.robot,{y: 174,pointerEvents: "none"})
+    this.spaceShip = document.createElementNS(svgns,"use")
+
+    // Beam
+    this.beam = document.createElementNS(svgns,"use")
+
+    // Ticks
+    this.createTicks()
+
+    // ------- APPEND ----------
+
+
+    // Beam 
+    this.arena.appendChild(this.beam)
+
+    // SpaceShip
+    this.arena.appendChild(this.spaceShip)
+
+    // Radio 
+    this.arena.appendChild(this.radioCircle)
+
+    // Robot
     this.arena.appendChild(this.robot)
 
-    
-    // Event listeners
-    this.goButton.addEventListener('pointerdown',()=>{
-      if (this.feedbackEnded){
-        this.restartGame()
-        this.feedbackEnded = false
-      } else {
-        gsap.set(this.goButton,{pointerEvents: "none"})
-        this.feedbackPlay()
-      }
+    // Ground
+    this.arena.appendChild(this.ground)
 
-    })
-    
+    //  -------  INITIALIZE -------
+    gsap.set(this.ground,{y: this.NUMBER_LINE_Y,scaleY: 1.55})
+    gsap.set(this.beam,{transformOrigin: "50% 0%",scale: 0})
+    gsap.set(this.spaceShip,{y: -200})
+    gsap.set(this.radioCircle,{attr: {r: 4},scale: 0,stroke: "red", strokeWidth: 4,transformOrigin: "50% 50%"})
+    gsap.set(this.robot,{y: this.NUMBER_LINE_Y-393})
+
+    // SpaceShip and Beam
+    this.spaceShip.setAttribute("href","#spaceship")
+    this.beam.setAttribute("href","#beam")
+
+    // Robotfset
+    this.robot.setAttribute("href","#robot")
+
+    // Radio Circle 
+
+    // Also in load puzzle
+
+    //--------- EVENTS ---------
+    this.goButton.addEventListener('pointerdown',this.goButtonClicked.bind(this))
+
+
+    this.nextButton.addEventListener('pointerdown',this.nextPuzzle.bind(this))
+
+
     this.background.addEventListener('pointerdown',()=>{
-      gsap.getProperty(this.curtain,"pointer-events")
-      console.log('restarting wand timeline')
-      this.setupWand()
-      this.wandtimeline.restart()
+      if (this.peeking){
+        this.uiGears.forEach(g=>{
+          gsap.to(g,{duration: 0.5,scale: 1})
+        })
+      } else {
+        this.wandtimeline.restart()
+      }
     })
 
 
     let controlsImage = document.createElementNS(svgns,"use")
     controlsImage.setAttribute("href","#controlsImage")
-
 
     this.curtain = document.createElementNS(svgns,"rect")
     gsap.set(this.curtain,{pointerEvents: "none",width: 1280,height: 720,fill: "#000000",alpha:0})
@@ -602,25 +782,23 @@ export class RadialLinear {
 
     gsap.set(this.controlPad,{scale: 0.5,y:1000,x: 200})
 
-
-    this.ctltimeline.to(this.overlay,{duration: 1,x: 0})
-
-
-    // Timelines
-    this.buildWandTimeline()
-    this.buildSpaceShipTimeline(640)
+    // 
 
     // Generate UI Elements
-    this.createTicks()
+   
+
+    // Drawing 
     this.drawTicks()
+
+    this.uiGears.forEach(b=>{this.arena.append(b)})
 
     this.controlPad.addEventListener('pointerdown',this.controlPadDown.bind(this))
     this.arena.appendChild(this.controlPad)
 
-    setTimeout(()=>{
-      this.introtimeline.add(this.shiptimeline.play())
-      this.introtimeline.play()
-    },1500)
+    this.robotBBox = this.robot.getBBox()
+    this.loadPuzzle(this.currentPuzzle)
+
+
 
   }
 }

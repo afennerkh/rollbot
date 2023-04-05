@@ -17,12 +17,24 @@
     position: absolute;
   }
 
-  .goBtn:hover {
+  .nextBtn {
+    background-image: url("https://res.cloudinary.com/duim8wwno/image/upload/v1680697080/NextArrow_p54tpq.svg");
+    background-size: cover;
+    width: 8%;
+    padding-bottom: 8%;
+    top: 45vw;
+    left: 91%;  
+    position: absolute;
+  }
+
+  .goBtn .nextBtn :hover {
     scale: 1.2;
   }
 
 
 
 .scene {
-    width: 100%
+    width: 100%;
+    height: 56vw;
+    background-color: aqua;
 }
