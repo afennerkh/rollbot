@@ -24,7 +24,14 @@ export class RadialLinearComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.id = this.route.snapshot.paramMap.get('id')
+    const id = this.route.snapshot.paramMap.get('id')
+    if (id) {
+      this.id = id
+    } else {
+      this.id = "demo"
+    }
+
+   
     const puzzles = Levels[this.id] as Array<any>
 
     const dom = {

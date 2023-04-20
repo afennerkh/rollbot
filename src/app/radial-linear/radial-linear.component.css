@@ -27,7 +27,7 @@
     position: absolute;
   }
 
-  .goBtn .nextBtn :hover {
+  .goBtn:hover {
     scale: 1.2;
   }
 

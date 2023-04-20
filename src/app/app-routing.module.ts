@@ -5,6 +5,7 @@ import { RadialLinear } from './radial-linear/kh-radial-linear';
 
 const routes: Routes = [
   { path: ':id', component: ContainerComponent },
+  { path: '', component: ContainerComponent },
 ]
 
 @NgModule({
