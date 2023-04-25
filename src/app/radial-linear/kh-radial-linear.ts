@@ -178,7 +178,7 @@ export class RadialLinear {
     this.ctltimeline = gsap.timeline({paused: true})
     this.shiptimeline = gsap.timeline({paused: true})
     this.introtimeline = gsap.timeline({paused: true})
-    this.scoringtimeline = gsap.timeline({paused: true})
+    this.scoringtimeline = gsap.timeline({onComplete: this.onScoringComplete.bind(this),paused: true})
 
     this.point = this.arena.createSVGPoint()
 
@@ -202,18 +202,22 @@ export class RadialLinear {
   }
 
   onFeedBackEnded(){
-    gsap.to(this.goButton,{duration: 1,scale: 1,ease: "elastic"})
     gsap.set(this.arena,{pointerEvents: "none"})
-    gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1665147162/RetryBtn_jhupgo.svg"})`})
     this.feedbackEnded = true
     this.scorePuzzle()
+  }
+
+  onScoringComplete(){
+    gsap.set(this.nextButton,{duration: 1,scale: 1,ease: "elastic"})
+    gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1665147162/RetryBtn_jhupgo.svg"})`})
+    gsap.to(this.goButton,{duration: 2.5,scale: 1,ease: "elastic"})
   }
 
   nextPuzzle(){
     this.abandonEditing()
     this.puzzleIndex = (this.puzzleIndex+1)%this.puzzleCount
     let newPuzzle = this.getPuzzle(this.puzzleIndex)
-      this.loadPuzzle(newPuzzle)
+    this.loadPuzzle(newPuzzle)
   }
   
 
@@ -232,9 +236,10 @@ export class RadialLinear {
     gsap.set(this.arena,{pointerEvents: "auto"})
     gsap.set(this.curtain,{alpha: 0,pointerEvents: "none"})
     gsap.set(this.robot,{x: 0,y: this.NUMBER_LINE_Y-this.robotFrame.height,pointerEvents: "none"})
-    gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1644246521/SpotlightGoBtn_eqeyvr.svg"})`})
+    gsap.set(this.goButton,{pointerEvents: "auto",backgroundImage: `url(${"https://res.cloudinary.com/duim8wwno/image/upload/v1682434926/BlueGoButton_oqeecj.svg"})`})
     gsap.set(this.shipGroup,{y: -300})
     gsap.set(this.beam,{scaleY: 0})
+    gsap.to(this.nextButton,{scale: 0,duration: 0.25})
 
     if (puzzle.input === "ship"){
       console.log("draggabe")
@@ -624,9 +629,9 @@ export class RadialLinear {
       if (editableBatteries.length != 0){
         this.wandtimeline.clear()
         this.wandtimeline.to(this.curtain,{duration: 0.5,alpha: 0.5})
-        this.wandtimeline.to(editableBatteries,{duration: 0.35,scaleX: 1.3,scaleY: 0.7},"<")
-        this.wandtimeline.to(editableBatteries,{duration: 0.35,scaleX: 0.7,scaleY: 1.3})
-        this.wandtimeline.to(editableBatteries,{duration: 0.8,scale: 1,ease: "elastic"})
+        this.wandtimeline.to(editableBatteries,{duration: 0.3,scaleX: 1.3,scaleY: 0.7},"<")
+        this.wandtimeline.to(editableBatteries,{duration: 0.3,scaleX: 0.7,scaleY: 1.3})
+        this.wandtimeline.to(editableBatteries,{duration: 0.5,scale: 1,ease: "elastic"})
         this.wandtimeline.pause()
       } else if (this.currentPuzzle.input == "ship"){
         gsap.set(this.curtain,{pointerEvents: "none"})
@@ -668,7 +673,6 @@ export class RadialLinear {
 
     // new score method
     let c = this.shipLocation
-    console.log('c',c)
     let valMin = c-this.currentPuzzle.shipWidth/2
     let valMax = c+this.currentPuzzle.shipWidth/2
     let centerVal = rx/this.CIRCUMFRENCE // because robot starts at zero
@@ -862,6 +866,10 @@ export class RadialLinear {
     this.curtain.addEventListener('pointerdown',()=>this.abandonEditing())
     this.arena.appendChild(this.curtain)
     
+
+    // ----- SETTING PROPERTIES
+
+    gsap.set(this.nextButton,{scale: 0,transformOrigin: "100% 100%"})
 
     let nl = document.createElementNS(svgns,"line")
     gsap.set(nl,{attr: {y1: 0,x1:0,y2: 0,x2:1280},strokeWidth:4,y: this.NUMBER_LINE_Y,stroke: "#ffffff"})
