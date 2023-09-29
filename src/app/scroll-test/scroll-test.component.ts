@@ -16,7 +16,7 @@ export class ScrollTestComponent implements AfterViewInit {
   ngAfterViewInit(): void {
    
 
-    const api = new ScrollTestApi(this.arena,"")
+    const api = new ScrollTestApi(this.arena.nativeElement,"")
   }
 
 }
