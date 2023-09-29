@@ -8,6 +8,7 @@ import { ContainerComponent } from './container/container.component';
 import { SpotlightComponent } from './spotlight/spotlight.component';
 import { TestcomponentComponent } from './testcomponent/testcomponent.component';
 import { RadialLinearComponent } from './radial-linear/radial-linear.component';
+import { ScrollTestComponent } from './scroll-test/scroll-test.component';
 
 @NgModule({
   declarations: [
@@ -17,6 +18,7 @@ import { RadialLinearComponent } from './radial-linear/radial-linear.component';
     SpotlightComponent,
     TestcomponentComponent,
     RadialLinearComponent,
+    ScrollTestComponent,
   ],
   imports: [
     BrowserModule,
